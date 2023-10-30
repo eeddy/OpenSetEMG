@@ -4,7 +4,7 @@ from libemg.utils import *
 from libemg.emg_classifier import * 
 from libemg.feature_extractor import FeatureExtractor 
 from LSTM import LSTM
-from AE import AE
+from AE import LSTMAE
 from openmax import *
 from sktime.transformations.panel.interpolate import TSInterpolator
 
@@ -37,17 +37,17 @@ for c in ["1","2","3","4","5","6"]:
             train_labels.append(int(c)-1)
             train_gestures.append(gesture)
 
-adl_windows = extract_adl_data(subject, WINDOW_SIZE, WINDOW_INCREMENT)[0]
-
 dl = make_data_loader(np.array(train_gestures), np.array(train_labels))
+
 # Gesture segmentation 
-ae = AE(train_gestures[0].shape[1])
+ae = LSTMAE(train_gestures[0].shape[1], hidden_dim=8)
 ae.fit(dl, num_epochs=50)
+preds = ae.predict(test_gestures)
 
 # Gesture prediction 
 lstm = LSTM(n_classes=len(np.unique(train_labels)), n_features=8)
 lstm.fit(dl, num_epochs=50)
-
+print("HERE!")
 
 # # Check test data
 # t = torch.tensor(test_gestures, dtype=torch.float32)
