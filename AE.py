@@ -4,7 +4,7 @@ import torch.optim as optim
 import torch
 import numpy as np
 import sklearn.metrics as metrics
-
+from tslearn.metrics import dtw_path
 import torch
 import torch.nn as nn
 
@@ -20,15 +20,17 @@ class Encoder(nn.Module):
 
         self.layer1 = nn.LSTM(
             input_size=hidden_dimension,
-            hidden_size=int(hidden_dimension),
+            hidden_size=int(4),
             num_layers=1,
-            batch_first=True
+            batch_first=True,
+            bidirectional=True,
         )
         self.layer2 = nn.LSTM(
-            input_size=int(hidden_dimension),
-            hidden_size=int(7),
+            input_size=int(4) * 2,
+            hidden_size=int(2),
             num_layers=1,
-            batch_first=True
+            batch_first=True,
+            bidirectional=True,
         )
         
     def forward(self, x):
@@ -42,18 +44,20 @@ class Decoder(nn.Module):
         super(Decoder, self).__init__()
 
         self.layer1 = nn.LSTM(
-            input_size=int(7),
-            hidden_size=int(7),
+            input_size=int(2) * 2,
+            hidden_size=int(4),
             num_layers=1,
-            batch_first=True
+            batch_first=True,
+            bidirectional=True,
         )
         self.layer2 = nn.LSTM(
-            input_size=int(7),
+            input_size=int(4) * 2,
             hidden_size=int(hidden_dimension),
             num_layers=1,
-            batch_first=True
+            batch_first=True,
+            bidirectional=True,
         )
-        self.output_layer = nn.Linear(hidden_dimension, n_features)
+        self.output_layer = nn.Linear(hidden_dimension * 2, n_features)
         
     def forward(self, x):
         x, _ = self.layer1(x)
@@ -81,7 +85,7 @@ class LSTMAE(nn.Module):
         # get the optimizer and loss function ready
         optimizer = optim.Adam(self.parameters(), lr=learning_rate)
         scheduler =  torch.optim.lr_scheduler.StepLR(optimizer, step_size=25, gamma=0.9)
-        loss_function = nn.MSELoss() #SoftDTW(use_cuda=False, gamma = 1e-3)
+        loss_function = SoftDTW(use_cuda=False, gamma = 1e-3) #nn.L1Loss() #nn.MSELoss() #SoftDTW(use_cuda=False, gamma = 1e-3)
 
         # now start the training
         for epoch in range(num_epochs):
@@ -96,6 +100,7 @@ class LSTMAE(nn.Module):
                 data = data.to(device)
                 output = self.forward(data)
                 loss = loss_function(output, data)
+                loss = loss.mean()
                 mean_losses.append(loss.item())
                 loss.backward()
                 optimizer.step()
@@ -113,8 +118,42 @@ class LSTMAE(nn.Module):
         y = self.forward(x.to(device))
         errors = []
         for i,v in enumerate(y):
-            errors.append(metrics.mean_squared_error(v.cpu().detach().numpy(),x[i].cpu()))
+            _, dist = dtw_path(v.cpu().detach().numpy(),x[i].cpu())
+            errors.append(dist)
         return np.array(errors)
+    
+    def predict_msa(self, x):
+        device = 'cuda' if torch.cuda.is_available() else 'cpu'
+        if type(x) != torch.Tensor:
+            x = torch.tensor(x, dtype=torch.float32)
+        y = self.forward(x.to(device))
+        errors = []
+        for i,v in enumerate(y):
+            dist = metrics.mean_absolute_error(v.cpu().detach().numpy(),x[i].cpu())
+            errors.append(dist)
+        return np.array(errors)
+    
+    def predict_mse(self, x):
+        device = 'cuda' if torch.cuda.is_available() else 'cpu'
+        if type(x) != torch.Tensor:
+            x = torch.tensor(x, dtype=torch.float32)
+        y = self.forward(x.to(device))
+        errors = []
+        for i,v in enumerate(y):
+            dist = metrics.mean_squared_error(v.cpu().detach().numpy(),x[i].cpu())
+            errors.append(dist)
+        return np.array(errors)
+        
+    # def predict_mse(self, x):
+    #     device = 'cuda' if torch.cuda.is_available() else 'cpu'
+    #     if type(x) != torch.Tensor:
+    #         x = torch.tensor(x, dtype=torch.float32)
+    #     y = self.forward(x.to(device))
+    #     errors = []
+    #     for i,v in enumerate(y):
+    #         dist = metrics.mean_absolute_error(v.cpu().detach().numpy(),x[i].cpu())
+    #         errors.append(dist)
+    #     return np.array(errors)
     
     def predict_data(self, x):
         device = 'cuda' if torch.cuda.is_available() else 'cpu'

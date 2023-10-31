@@ -38,7 +38,7 @@ def make_data_loader(gestures, classes, batch_size=5):
     obj = DL_input_data(gestures, classes)
     dl = DataLoader(obj,
     batch_size=batch_size,
-    # shuffle=True,
+    shuffle=True,
     collate_fn = collate_fn)
     return dl
 

@@ -8,8 +8,8 @@ from AE import LSTMAE
 from openmax import *
 from sktime.transformations.panel.interpolate import TSInterpolator
 
-WINDOW_SIZE = 30
-WINDOW_INCREMENT = 10
+WINDOW_SIZE = 20
+WINDOW_INCREMENT = 5
 FEATURES = ['MAV']
 
 fix_random_seed(1)
@@ -21,16 +21,16 @@ train_gestures = []
 train_labels = []
 test_gestures = []
 test_labels = []
-for s in [2]:
+for s in [1]:
     print("Subject " + str(s))
     dataset_folder = 'Data/S' + str(s) + '/ww_end/'
-    for c in ["1"]: #["1","2","3","4","5","6"]:
+    for c in ["1","2","3","4","5","6"]: #["1","2","3","4","5","6"]:
         for r in ["0","1","2","3","4","5","6","7","8","9"]:
             data = np.loadtxt(dataset_folder + c + '/R_' + r + '_C_0.csv', delimiter=',')
             windows = get_windows(data, WINDOW_SIZE, WINDOW_INCREMENT)
             gesture = EMGClassifier()._format_data(fe.extract_features(FEATURES, windows))
-            if len(gesture) < 20:
-                ts = TSInterpolator(20)
+            if len(gesture) < 50:
+                ts = TSInterpolator(50)
                 gesture = ts.fit_transform(gesture)
             if int(r) > 7:
                 test_labels.append(int(c)-1)
@@ -39,12 +39,18 @@ for s in [2]:
                 train_labels.append(int(c)-1)
                 train_gestures.append(gesture)
 
+# max_list = [max(np.vstack([train_gestures, test_gestures])[:,:,i].flatten()) for i in range(0, np.vstack([train_gestures, test_gestures]).shape[2])]
+# train_gestures = [v/max_list for v in train_gestures]
+# test_gestures = [v/max_list for v in test_gestures]
 
-dl = make_data_loader(np.array(train_gestures), np.array(train_labels), 8)
+train_gestures = [v/np.amax(v, axis=0) for v in train_gestures]
+test_gestures = [v/np.amax(v, axis=0) for v in test_gestures]
+
+dl = make_data_loader(np.array(train_gestures), np.array(train_labels), 48)
 
 # Gesture segmentation 
 ae = LSTMAE(train_gestures[0].shape[1], hidden_dim=8)
-ae.fit(dl, learning_rate=1e-1, num_epochs=100)
+ae.fit(dl, learning_rate=1e-3, num_epochs=2000)
 preds = ae.predict(test_gestures)
 
 # Gesture prediction 
@@ -77,6 +83,12 @@ preds = ae.predict(test_gestures)
 adl_windows = extract_adl_data(s, WINDOW_SIZE, WINDOW_INCREMENT)[0]
 adl_features = EMGClassifier()._format_data(fe.extract_features(FEATURES, adl_windows))
 adl_features = np.array([np.array(adl_features[z:z+20]) for z in range(0,len(adl_features) - 20)])
+adl_features = [v/np.amax(v, axis=0) for v in adl_features]
+
+# adl_features = [v/max_list for v in adl_features]
+
+
+#adl_features = [v/max_list for v in adl_features]
 # adl_f = torch.tensor(adl_features, dtype=torch.float32)
 # adl_gestures = [v/max_list for v in adl_features]
 # adl_preds = ae.predict(adl_gestures)
