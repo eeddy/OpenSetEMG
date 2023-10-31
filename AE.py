@@ -84,8 +84,8 @@ class LSTMAE(nn.Module):
         device = 'cuda' if torch.cuda.is_available() else 'cpu'
         # get the optimizer and loss function ready
         optimizer = optim.Adam(self.parameters(), lr=learning_rate)
-        scheduler =  torch.optim.lr_scheduler.StepLR(optimizer, step_size=25, gamma=0.9)
-        loss_function = SoftDTW(use_cuda=False, gamma = 1e-3) #nn.L1Loss() #nn.MSELoss() #SoftDTW(use_cuda=False, gamma = 1e-3)
+        # scheduler =  torch.optim.lr_scheduler.StepLR(optimizer, step_size=25, gamma=0.9)
+        loss_function = SoftDTW(use_cuda=False, gamma = 1e-2) #nn.MSELoss() #SoftDTW(use_cuda=False, gamma = 1e-3) #nn.MSELoss() #SoftDTW(use_cuda=False, gamma = 1e-3) #nn.L1Loss() #nn.MSELoss() #SoftDTW(use_cuda=False, gamma = 1e-3)
 
         # now start the training
         for epoch in range(num_epochs):
@@ -98,6 +98,7 @@ class LSTMAE(nn.Module):
             for data, labels in tr_dl:
                 optimizer.zero_grad()
                 data = data.to(device)
+                # data_hat = data + 0.01 * torch.randn_like(data)
                 output = self.forward(data)
                 loss = loss_function(output, data)
                 loss = loss.mean()
@@ -105,7 +106,7 @@ class LSTMAE(nn.Module):
                 loss.backward()
                 optimizer.step()
             print("Mean Losses: " + str(np.mean(mean_losses)))
-            #scheduler.step()
+            # scheduler.step()
             # print("Loss: " + str(loss.item()))
             #avg_loss = sum(epoch_loss)/len(epoch_loss)
             #print("Loss: " + str(avg_loss))

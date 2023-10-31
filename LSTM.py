@@ -15,7 +15,7 @@ class LSTM(nn.Module):
         self.relu = nn.ReLU()
 
     def forward_nosm(self, x):
-        output, _ = self.lstm(out)
+        output, _ = self.lstm(x)
         out = output[:, -1, :]
         out = self.relu(out)
         out = self.linear_1(out)
@@ -29,6 +29,7 @@ class LSTM(nn.Module):
 
     def fit(self, tr_dl, learning_rate=1e-3, num_epochs=100, verbose=True):
         device = 'cuda' if torch.cuda.is_available() else 'cpu'
+        self.to(device)
         # get the optimizer and loss function ready
         optimizer = optim.Adam(self.parameters(), lr=learning_rate)
         loss_function = nn.CrossEntropyLoss()
@@ -55,7 +56,7 @@ class LSTM(nn.Module):
                 self.log["training_accuracy"] += [(epoch, acc)]
             self.eval()
             if verbose:
-                    epoch_trloss = np.mean([i[1] for i in self.log['training_loss'] if i[0]==epoch])
-                    epoch_tracc  = np.mean([i[1] for i in self.log['training_accuracy'] if i[0]==epoch])
-                    print(f"{epoch}: trloss:{epoch_trloss:.2f}  tracc:{epoch_tracc:.2f}")
+                epoch_trloss = np.mean([i[1] for i in self.log['training_loss'] if i[0]==epoch])
+                epoch_tracc  = np.mean([i[1].cpu() for i in self.log['training_accuracy'] if i[0]==epoch])
+                print(f"{epoch}: trloss:{epoch_trloss:.2f}  tracc:{epoch_tracc:.2f}")
         self.eval()
